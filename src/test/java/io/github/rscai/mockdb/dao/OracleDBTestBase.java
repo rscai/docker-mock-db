@@ -21,7 +21,11 @@ public abstract class OracleDBTestBase extends DataSourceBasedDBTestCase {
   protected void setUpDatabaseConfig(DatabaseConfig config) {
     super.setUpDatabaseConfig(config);
     config.setProperty(DatabaseConfig.FEATURE_QUALIFIED_TABLE_NAMES, true);
+    config.setProperty(DatabaseConfig.FEATURE_BATCHED_STATEMENTS,true);
+    config.setProperty(DatabaseConfig.FEATURE_SKIP_ORACLE_RECYCLEBIN_TABLES,true);
   }
+  
+  
 
   @Override
   protected DatabaseOperation getSetUpOperation() throws Exception {
