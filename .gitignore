@@ -37,3 +37,4 @@ buildNumber.properties
 hs_err_pid*
 /.idea/
 /docker-mock-db.iml
+!/libs/ojdbc6.jar
