@@ -1,0 +1,26 @@
+language: java
+sudo: required
+services:
+  - docker
+install: true
+addons:
+  sonarcloud:
+    organization: $SONAR_CLOUD_ORGANIZATION
+    token: $SONAR_CLOUD_TOKEN
+jdk:
+  - oraclejdk8
+before_install:
+  - docker pull sath89/oracle-xe-11g
+cache:
+  directories:
+    - '$HOME/.m2/repository'
+    - '$HOME/.sonar/cache'
+jobs:
+  include:
+    - stage: build
+      script: mvn clean test org.jacoco:jacoco-maven-plugin:prepare-agent
+    - stage: analysis
+      script: mvn sonar:sonar
+stages:
+  - build
+  - analysis
