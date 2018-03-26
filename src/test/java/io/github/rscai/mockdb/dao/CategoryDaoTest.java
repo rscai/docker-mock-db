@@ -13,10 +13,17 @@ import com.spotify.docker.client.messages.PortBinding;
 import io.github.rscai.mockdb.model.Category;
 import io.github.rscai.mockdb.schema.Dev;
 import java.net.URI;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.dbunit.PropertiesBasedJdbcDatabaseTester;
 import org.dbunit.dataset.DataSetException;
 import org.dbunit.dataset.DefaultDataSet;
@@ -44,17 +51,27 @@ import org.springframework.test.context.junit4.SpringRunner;
 )
 public class CategoryDaoTest extends OracleDBTestBase {
 
+  private static final Log LOGGER = LogFactory.getLog(CategoryDaoTest.class);
+  public static final String DOCKER_DATABASE_CONTAINER_ID = "docker.database.containerId";
+  public static final String DOCKER_HOST = "docker.host";
+  public static final String DOCKER_DATABASE_HOST = "docker.database.host";
+  public static final String DOCKER_IMAGE_ORACLE = "docker.image.oracle";
+  public static final String DOCKER_DATABASE_URL_TEMPLATE = "docker.database.url.template";
+  public static final String DOCKER_DATABASE_USERNAME = "docker.database.username";
+  public static final String DOCKER_DATABASE_PASSWORD = "docker.database.password";
+  public static final String DOCKER_DATABASE_DRIVER_CLASS = "docker.database.driverClass";
+
   @BeforeClass
   public static void beforeClass() throws Exception {
-    String dockerHost = System.getProperty("docker.host", "http://ubuntu-vb:4243");
-    String databaseHost = System.getProperty("docker.database.host", "ubuntu-vb");
-    String image = System.getProperty("docker.image.oracle", "sath89/oracle-xe-11g");
+    String dockerHost = System.getProperty(DOCKER_HOST, "unix:///var/run/docker.sock");
+    String databaseHost = System.getProperty(DOCKER_DATABASE_HOST, "127.0.0.1");
+    String image = System.getProperty(DOCKER_IMAGE_ORACLE, "sath89/oracle-xe-11g");
     String urlTemplate = System
-        .getProperty("docker.database.url.template", "jdbc:oracle:thin:@%s:%d:xe");
-    String databaseUsername = System.getProperty("docker.database.username", "system");
-    String databasePassword = System.getProperty("docker.database.password", "oracle");
+        .getProperty(DOCKER_DATABASE_URL_TEMPLATE, "jdbc:oracle:thin:@%s:%d:xe");
+    String databaseUsername = System.getProperty(DOCKER_DATABASE_USERNAME, "system");
+    String databasePassword = System.getProperty(DOCKER_DATABASE_PASSWORD, "oracle");
     String driverClass = System
-        .getProperty("docker.database.driverClass", "oracle.jdbc.driver.OracleDriver");
+        .getProperty(DOCKER_DATABASE_DRIVER_CLASS, "oracle.jdbc.driver.OracleDriver");
 
     DefaultDockerClient docker = DefaultDockerClient.builder().uri(new URI(dockerHost)).build();
     Map<String, List<PortBinding>> portBindings = new TreeMap<>();
@@ -69,8 +86,22 @@ public class CategoryDaoTest extends OracleDBTestBase {
     final int port = Integer
         .valueOf(info.networkSettings().ports().get("1521/tcp").get(0).hostPort());
 
-    Thread.sleep(90000);
-    System.setProperty("docker.database.containerId", creation.id());
+    System.setProperty(DOCKER_DATABASE_CONTAINER_ID, creation.id());
+
+    //Thread.sleep(60000);
+    final long MAX_WAIT_SECOND = 90;
+    long startCheckAt = System.currentTimeMillis() / 1000;
+    while (!checkIfUp(driverClass, String.format(urlTemplate, databaseHost, port), databaseUsername,
+        databasePassword)) {
+      long now = System.currentTimeMillis() / 1000;
+      LOGGER.info(
+          String.format("Checking if database is up for %d second", now - startCheckAt));
+      if (now - startCheckAt > MAX_WAIT_SECOND) {
+        throw new Exception(String
+            .format("Start database fail, not ready after %d seconds", now - startCheckAt));
+      }
+      Thread.sleep(5000);
+    }
 
     System.setProperty(PropertiesBasedJdbcDatabaseTester.DBUNIT_CONNECTION_URL,
         String.format(urlTemplate, databaseHost, port));
@@ -79,9 +110,29 @@ public class CategoryDaoTest extends OracleDBTestBase {
     System.setProperty(PropertiesBasedJdbcDatabaseTester.DBUNIT_DRIVER_CLASS, driverClass);
   }
 
+  private static boolean checkIfUp(final String driverClass, final String url,
+      final String username, final String password) throws ClassNotFoundException {
+    Class.forName(driverClass);
+    try (Connection connection = DriverManager.getConnection(url, username, password);
+        Statement stmt = connection.createStatement();
+        ResultSet resultSet = stmt.executeQuery("SELECT 1 FROM DUAL")
+    ) {
+      if (resultSet.next()) {
+        return true;
+      } else {
+        return false;
+      }
+
+    } catch (SQLException ex) {
+      return false;
+    }
+
+
+  }
+
   @AfterClass
   public static void afterClass() throws Exception {
-    String dockerHost = System.getProperty("docker.host", "http://ubuntu-vb:4243");
+    String dockerHost = System.getProperty("docker.host", "unix:///var/run/docker.sock");
     String containerId = System.getProperty("docker.database.containerId");
 
     DefaultDockerClient docker = DefaultDockerClient.builder().uri(new URI(dockerHost)).build();
