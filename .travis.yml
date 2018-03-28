@@ -17,9 +17,10 @@ cache:
     - '$HOME/.sonar/cache'
 jobs:
   include:
-    - stage: build
-      script: mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar
-    - stage: analysis
-      script: mvn sonar:sonar
+    - stage: compile
+      script: mvn clean compile
+    - stage: verify
+      script: mvn org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar
 stages:
-  - build
+  - compile
+  - verify
