@@ -18,9 +18,8 @@ cache:
 jobs:
   include:
     - stage: build
-      script: mvn clean test org.jacoco:jacoco-maven-plugin:prepare-agent
+      script: mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent test sonar:sonar
     - stage: analysis
       script: mvn sonar:sonar
 stages:
   - build
-  - analysis
